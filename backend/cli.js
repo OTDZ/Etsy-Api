@@ -74,7 +74,7 @@ async function createListings(shop_id) {
 
         if (response.status === 201) {
             console.log(`Successfully created listing for row #${row}! View draft listing at https://www.etsy.com/your/shops/me/listing-editor/edit/${data.listing_id}\n`);
-        } else if (response.status === 400) {
+        } else if (response.status === 400 || response.status === 404) {
             console.log(`Failed to create listing for row #${row}`);
             console.error(data);
             console.log("To view field specification and formatting, see https://developers.etsy.com/documentation/reference/#operation/createDraftListing\n");
