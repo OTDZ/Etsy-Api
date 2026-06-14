@@ -20,7 +20,7 @@ function initialiseServer() {
     app.use(express.json());
 
     const { state, challenge, verifier } = generateChallenge();
-    const oauthUrl = `https://www.etsy.com/oauth/connect?response_type=code&redirect_uri=http://localhost:3000/oauth/redirect&scope=listings_w%20shops_r%20email_r&client_id=${ETSY_API_KEY_STRING}&state=${state}&code_challenge=${challenge}&code_challenge_method=S256`;
+    const oauthUrl = `https://www.etsy.com/oauth/connect?response_type=code&redirect_uri=http://localhost:3000/oauth/redirect&scope=listings_w%20shops_r%20email_r%20listings_r&client_id=${ETSY_API_KEY_STRING}&state=${state}&code_challenge=${challenge}&code_challenge_method=S256`;
 
     app.get("/api/authenticate", (req, res) => {
         res.redirect(oauthUrl);
@@ -168,8 +168,6 @@ function initialiseServer() {
 
     // GetSellerTaxonomyNodes - Retrieves the full hierarchy tree of seller taxonomy nodes
     app.get("/api/taxonomy", async (req, res) => {
-        const shop_id = req.params.shopId;
-
         const response = await fetch(`https://api.etsy.com/v3/application/seller-taxonomy/nodes`, {
             method: "GET",
             headers: {
@@ -180,7 +178,27 @@ function initialiseServer() {
 
         const data = await response.json();
         res.status(response.status).send(data);
-    });    
+    });
+
+    // UpdateListingInventory - Updates the inventory for a listing identified by a listing ID
+    app.post("/api/listings/:listingId/inventory", async (req, res) => {
+        const listing_id = req.params.listingId;
+        const inventory = req.body;
+
+        const response = await fetch(`https://api.etsy.com/v3/application/listings/${listing_id}/inventory`, {
+            method: "PUT",
+            body: JSON.stringify(inventory),
+            headers: {
+                "Content-Type": "application/json",
+                "x-api-key": ETSY_API_KEY,
+                "Authorization": `Bearer ${ETSY_ACCESS_TOKEN}`
+            }
+        });
+
+        const data = await response.json();
+        res.status(response.status).send(data);        
+
+    })
 
     // CreateDraftListing - Creates a physical draft listing product in a shop on the Etsy channel
     app.post("/api/shops/:shopId/list", async (req, res) => {

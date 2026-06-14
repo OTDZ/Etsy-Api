@@ -1,10 +1,11 @@
 import dotenv from "dotenv";
 import { question } from "./cli-questioner.js";
-import { parseCsv } from "./csv-parser.js";
+import { parseListings, parseVariations } from "./csv-parser.js";
 
 dotenv.config();
 
 const LISTINGS_CSV_FILEPATH = process.env.LISTINGS_CSV_FILEPATH;
+const VARIATIONS_CSV_FILEPATH = process.env.VARIATIONS_CSV_FILEPATH;
 
 const domain = "http://localhost:3000";
 
@@ -60,20 +61,95 @@ async function getUserInfo() {
     }
 }
 
+async function addVariations(listing_id, variations) {
+    const response = await fetchWithTokenRefresh(`${domain}/api/listings/${encodeURIComponent(listing_id)}/inventory`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(variations)
+    });
+    const data = await response.json();
+
+    if (response.status === 200) {
+        console.log(data);
+    } else {
+        throw Error(JSON.stringify(data));
+    }
+}
+
 async function createListings(shop_id) {
-    const listings = parseCsv(LISTINGS_CSV_FILEPATH);
+    const listings = parseListings(LISTINGS_CSV_FILEPATH);
+    const variations = parseVariations(VARIATIONS_CSV_FILEPATH);
     let row = 1;
     for (const listing of listings) {
+        const { variation_ids, ...listing_fields } = listing;
         const response = await fetchWithTokenRefresh(`${domain}/api/shops/${encodeURIComponent(shop_id)}/list`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(listing)
+            body: JSON.stringify(listing_fields)
         });
 
         const data = await response.json();
 
         if (response.status === 201) {
-            console.log(`Successfully created listing for row #${row}! View draft listing at https://www.etsy.com/your/shops/me/listing-editor/edit/${data.listing_id}\n`);
+            const listing_id = data.listing_id;
+            console.log(`Successfully created listing for row #${row}! View draft listing at https://www.etsy.com/your/shops/me/listing-editor/edit/${listing_id}\n`);
+
+            // Add variation if variation_ids has been specified in listings csv that corresponds to variation_ids in variations csv
+            // Build products json
+            if (variation_ids) {
+                console.log(`Attempting to add variation(s) ${variation_ids} to listing row #${row} (listing id: ${listing_id})\n`);
+                const variation_ids_list = variation_ids.split(",").map(id => id.trim());
+                const products = [];
+                for (const variation_id of variation_ids_list) {
+                    const variation = variations[variation_id];
+                    if (variation) {
+                        const product = {
+                            sku: variation.sku,
+                            offerings: [
+                                {
+                                    price: variation.price,
+                                    quantity: variation.quantity,
+                                    is_enabled: variation.is_enabled,
+                                    readiness_state_id: variation.readiness_state_id
+                                }
+                            ],
+                            property_values: [
+                                {
+                                    property_id: 513,
+                                    property_name: variation.variation_property_name,
+                                    values: [variation.variation_property_value]
+                                }
+                            ]
+                        }
+                        products.push(product);
+                    }
+                    else {
+                        console.error(`variation_id ${variation_id} in listings row #${row} does not exist in ${VARIATIONS_CSV_FILEPATH}. variation_id ${variation_id} was not added to to listing row #${row} (listing id: ${listing_id})\n`);
+                    }
+                }
+                const response = await fetchWithTokenRefresh(`${domain}/api/listings/${encodeURIComponent(listing_id)}/inventory`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        products: products,
+                        price_on_property: [513],
+                        quantity_on_property: [513],
+                        sku_on_property: [513]
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.status === 200) {
+                    console.log(`Successfully added variation(s) ${variation_ids} to listing row #${row} (listing id: ${listing_id})\n`);
+                } else if (response.status === 400 || response.status === 404) {
+                    console.log(`Failed to create variation(s) ${variation_ids} in listings row #${row} (listing id: ${listing_id})`);
+                    console.error(data);
+                    console.log("To view field specification and formatting, see https://developers.etsy.com/documentation/reference/#operation/updateListingInventory\n");
+                } else {
+                    throw Error(JSON.stringify(data));
+                }
+            }
         } else if (response.status === 400 || response.status === 404) {
             console.log(`Failed to create listing for row #${row}`);
             console.error(data);
@@ -107,7 +183,7 @@ async function getProcessingProfiles(shop_id) {
     }
 }
 
-async function getTaxonomyIds() {
+async function getTaxonomies() {
     const response = await fetchWithTokenRefresh(`${domain}/api/taxonomy`);
     const data = await response.json();
 
@@ -131,7 +207,7 @@ export async function initialiseCLI() {
         console.log("1. Create listings using CSV");
         console.log("2. View your shipping profiles");
         console.log("3. View your processing profiles (readiness states)");
-        console.log("4. View Taxonomy ids");
+        console.log("4. View Taxonomy categories");
         console.log("5. Exit");
         console.log("─".repeat(40));
 
@@ -147,7 +223,7 @@ export async function initialiseCLI() {
             await getProcessingProfiles(shop_id);
         }
         else if (choice === "4") {
-            await getTaxonomyIds();
+            await getTaxonomies();
         }
         else if (choice === "5") {
             process.exit(1);
