@@ -180,6 +180,23 @@ function initialiseServer() {
         res.status(response.status).send(data);
     });
 
+    // GetListingInventory - Retrieves the inventory record for a listing
+    app.get("/api/listings/:listingId/inventory", async (req, res) => {
+        const listing_id = req.params.listingId;
+
+        const response = await fetch(`https://api.etsy.com/v3/application/listings/${listing_id}/inventory`, {
+            headers: {
+                "Content-Type": "application/json",
+                "x-api-key": ETSY_API_KEY,
+                "Authorization": `Bearer ${ETSY_ACCESS_TOKEN}`
+            }
+        });
+
+        const data = await response.json();
+        res.status(response.status).send(data);        
+
+    })    
+
     // UpdateListingInventory - Updates the inventory for a listing identified by a listing ID
     app.post("/api/listings/:listingId/inventory", async (req, res) => {
         const listing_id = req.params.listingId;
@@ -198,25 +215,6 @@ function initialiseServer() {
         const data = await response.json();
         res.status(response.status).send(data);        
 
-    })
-
-    // CreateDraftListing - Creates a physical draft listing product in a shop on the Etsy channel
-    app.post("/api/shops/:shopId/list", async (req, res) => {
-        const shop_id = req.params.shopId;
-        const listing = req.body;
-
-        const response = await fetch(`https://api.etsy.com/v3/application/shops/${shop_id}/listings`, {
-            method: "POST",
-            body: JSON.stringify(listing),
-            headers: {
-                "Content-Type": "application/json",
-                "x-api-key": ETSY_API_KEY,
-                "Authorization": `Bearer ${ETSY_ACCESS_TOKEN}`
-            }
-        });
-
-        const data = await response.json();
-        res.status(response.status).send(data);
     })
 
     app.listen(port, () => {
