@@ -64,16 +64,13 @@ async function addVariations(shop_id) {
     const variations = parseVariations(VARIATIONS_CSV_FILEPATH);
 
     // Get existing variations for listings
-    for (const variation of variations) {
-        const listing_id = variation.listing_id;
-
+    for (const [listing_id, rows] of Object.entries(variations)) {
+        console.log(`Attempting to add ${rows.length} variations to listing ${listing_id}`);
         const response = await fetchWithTokenRefresh(`${domain}/api/listings/${encodeURIComponent(listing_id)}/inventory`);
-
         const data = await response.json();
 
         if (response.status === 200) {
-            const existing_variations = data.products;
-            const cleaned_existing_variations = existing_variations.map(({ sku, offerings, property_values }) => ({
+            const cleaned_existing_variations = data.products.map(({ sku, offerings, property_values }) => ({
                 sku,
                 offerings: offerings.map(({ price, quantity, is_enabled, readiness_state_id }) => ({
                     price: price.amount / price.divisor,
@@ -87,8 +84,9 @@ async function addVariations(shop_id) {
                     value_ids,
                     values
                 }))
-            }));
-            const new_variation = {
+            }));           
+
+            const new_variations = rows.map(variation => ({
                 sku: variation.sku,
                 offerings: [
                     {
@@ -101,12 +99,18 @@ async function addVariations(shop_id) {
                 property_values: [
                     {
                         property_id: 513,
-                        property_name: variation.variation_property_name,
-                        values: [variation.variation_property_value]
-                    }
-                ]
-            }
-            const updated_variations = [...cleaned_existing_variations, new_variation];
+                        property_name: variation.variation_property_name_1,
+                        values: [variation.variation_property_value_1]
+                    },
+                    variation.variation_property_name_2 ? {
+                        property_id: 514,
+                        property_name: variation.variation_property_name_2,
+                        values: [variation.variation_property_value_2]
+                    } : null
+                ].filter(Boolean)
+            }));
+            
+            const updated_variations = [...cleaned_existing_variations, ...new_variations];
 
             const response = await fetchWithTokenRefresh(`${domain}/api/listings/${encodeURIComponent(listing_id)}/inventory`, {
                 method: "POST",
@@ -123,14 +127,14 @@ async function addVariations(shop_id) {
             const update_inventory_data = await response.json();
 
             if (response.status === 200) {
-                console.log(`Successfully added variation ${variation.variation_property_name} ${variation.variation_property_value} to listing ${listing_id}\n`);
+                console.log(`Successfully added ${rows.length} variations to listing ${listing_id}\n`);
             } else if (response.status === 400 || response.status === 404) {
-                console.log(`Failed to add variation ${variation.variation_property_name} ${variation.variation_property_value} to listing ${listing_id}`);
+                console.log(`Failed to add ${rows.length} variations to listing ${listing_id}`);
                 console.error(update_inventory_data);
                 console.log("To view field specification and formatting, see https://developers.etsy.com/documentation/reference/#operation/updateListingInventory\n");
             } else {
                 throw Error(JSON.stringify(data));
-            }            
+            }             
         } else {
             throw Error(JSON.stringify(data));
         }

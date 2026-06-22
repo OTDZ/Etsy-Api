@@ -1,3 +1,5 @@
-listing_id,variation_property_name,variation_property_value,sku,price,quantity,is_enabled,readiness_state_id
-4521786755,Size,1x2444,azazaazaaa,10.12,50,TRUE,1491639693168
-4521786755,Size,0x0,hhhhhh,10.12,50,TRUE,1491639693168
+listing_id,variation_property_name_1,variation_property_value_1,variation_property_name_2,variation_property_value_2,sku,price,quantity,is_enabled,readiness_state_id
+4526079971,Size,03x3,Colour,Red,tyjtjts,10.12,50,TRUE,1491639693168
+4526079971,Size,03x3,Colour,Blue,zzzzzzz,10.12,50,TRUE,1491639693168
+4526079971,Size,12x5,Colour,Red,aaaaaaaaa,10.12,50,TRUE,1491639693168
+4526079971,Size,12x5,Colour,Blue,eeeeeee,10.12,50,TRUE,1491639693168
